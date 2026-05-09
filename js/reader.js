@@ -90,10 +90,25 @@ function wireUI() {
   slider.min = String(CONFIG.fontSize.min);
   slider.max = String(CONFIG.fontSize.max);
   slider.value = String(readStoredFontSize());
+
+  let pendingFontSize = null;
+  let fontSizeRaf = 0;
+  let fontSizeSaveTimer = null;
   slider.addEventListener('input', () => {
-    const v = parseInt(slider.value, 10);
-    applyFontSize(v);
-    localStorage.setItem(STORAGE.fontSize, String(v));
+    pendingFontSize = parseInt(slider.value, 10);
+    if (!fontSizeRaf) {
+      fontSizeRaf = requestAnimationFrame(() => {
+        fontSizeRaf = 0;
+        if (pendingFontSize != null) applyFontSize(pendingFontSize);
+      });
+    }
+    if (fontSizeSaveTimer) clearTimeout(fontSizeSaveTimer);
+    fontSizeSaveTimer = setTimeout(() => {
+      fontSizeSaveTimer = null;
+      if (pendingFontSize != null) {
+        localStorage.setItem(STORAGE.fontSize, String(pendingFontSize));
+      }
+    }, 250);
   });
 
   window.addEventListener('scroll', onScroll, { passive: true });
