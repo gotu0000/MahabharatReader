@@ -1,0 +1,210 @@
+:root {
+  --bg: #1a1a1a;
+  --text: #d4d4d4;
+  --surface: #2a2a2a;
+  --accent: #7aa2f7;
+  --border: rgba(255, 255, 255, 0.08);
+  --topbar-bg: #1a1a1a;
+  --topbar-border: rgba(255, 255, 255, 0.06);
+  --shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
+
+  --font-body: Georgia, "Iowan Old Style", "Times New Roman", serif;
+  --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
+  --font-size: 18px;
+  --line-height: 1.7;
+  --reading-max: 700px;
+}
+
+[data-theme="light"] {
+  --bg: #fafaf7;
+  --text: #1a1a1a;
+  --surface: #ffffff;
+  --accent: #3563b8;
+  --border: rgba(0, 0, 0, 0.08);
+  --topbar-bg: #fafaf7;
+  --topbar-border: rgba(0, 0, 0, 0.08);
+  --shadow: 0 6px 24px rgba(0, 0, 0, 0.15);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+}
+
+body {
+  font-family: var(--font-ui);
+  -webkit-text-size-adjust: 100%;
+  min-height: 100vh;
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.6rem;
+  background: var(--topbar-bg);
+  border-bottom: 1px solid var(--topbar-border);
+  padding-top: max(0.5rem, env(safe-area-inset-top));
+}
+
+.title {
+  flex: 1 1 auto;
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex: 0 0 auto;
+}
+
+.icon-btn {
+  background: transparent;
+  color: var(--text);
+  border: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+}
+
+.icon-btn:hover { background: var(--border); }
+
+.icon-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.font-size {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0 0.35rem;
+}
+
+.font-size__label {
+  font-family: var(--font-body);
+  font-size: 1rem;
+  opacity: 0.75;
+  user-select: none;
+}
+
+.font-size input[type="range"] {
+  width: 76px;
+  accent-color: var(--accent);
+  margin: 0;
+}
+
+.theme-icon { display: none; }
+[data-theme="light"] .theme-icon--moon { display: block; }
+:not([data-theme="light"]) .theme-icon--sun { display: block; }
+
+.sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: min(82vw, 320px);
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  transform: translateX(-100%);
+  transition: transform 200ms ease;
+  z-index: 20;
+  padding: 0.75rem 0;
+  padding-top: max(0.75rem, env(safe-area-inset-top));
+  overflow-y: auto;
+}
+
+.sidebar.open {
+  transform: translateX(0);
+  box-shadow: var(--shadow);
+}
+
+.part-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.part-list button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  color: var(--text);
+  padding: 0.85rem 1rem;
+  font-family: var(--font-ui);
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.part-list button:hover { background: var(--border); }
+
+.part-list button.active {
+  color: var(--accent);
+  background: var(--border);
+  font-weight: 600;
+}
+
+.part-list button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 15;
+}
+
+.reader { outline: none; }
+
+.content {
+  font-family: var(--font-body);
+  font-size: var(--font-size);
+  line-height: var(--line-height);
+  max-width: var(--reading-max);
+  margin: 0 auto;
+  padding: 1.25rem 1.1rem 4rem;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.content p { margin: 0 0 1em; }
+.content h1, .content h2, .content h3 { line-height: 1.3; }
+.content img { max-width: 100%; height: auto; }
+.content a { color: var(--accent); }
+
+.hint {
+  opacity: 0.7;
+  font-style: italic;
+  text-align: center;
+  margin-top: 2rem !important;
+}
+
+@media (min-width: 720px) {
+  .content { padding: 2rem 1.5rem 5rem; }
+  .font-size input[type="range"] { width: 100px; }
+}
