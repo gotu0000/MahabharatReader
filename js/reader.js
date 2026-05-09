@@ -3,6 +3,12 @@ const CONFIG = {
   partCount: 10,
   fontSize: { min: 14, max: 28, default: 18 },
   defaultTheme: 'dark',
+  refs: {
+    selector: '[data-ref]',
+    path: (n) => `parts/refs/part-${pad2(n)}.json`,
+    keyOf: (el) => el.getAttribute('data-ref'),
+    labelOf: (el) => el.textContent.trim() || el.getAttribute('data-ref'),
+  },
 };
 
 const STORAGE = {
@@ -15,6 +21,13 @@ const STORAGE = {
 const state = {
   currentPart: null,
   scrollSaveTimer: null,
+};
+
+const refsCache = new Map();
+const popup = {
+  el: null,
+  prevFocus: null,
+  outsideHandler: null,
 };
 
 function pad2(n) {
@@ -85,8 +98,15 @@ function wireUI() {
 
   window.addEventListener('scroll', onScroll, { passive: true });
 
+  $('content').addEventListener('click', handleRefClick);
+
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') closeSidebar();
+    if (e.key !== 'Escape') return;
+    if (popup.el && !popup.el.hidden) {
+      hidePopup();
+    } else {
+      closeSidebar();
+    }
   });
 }
 
@@ -126,6 +146,7 @@ async function loadPart(n) {
   const url = `parts/part-${id}.html`;
   const content = $('content');
 
+  hidePopup();
   state.currentPart = n;
   localStorage.setItem(STORAGE.lastPart, String(n));
   highlightActive(n);
@@ -145,6 +166,7 @@ async function loadPart(n) {
 
   content.innerHTML = html;
   restoreScroll(n);
+  getRefs(n);
 }
 
 function restoreScroll(n) {
@@ -173,4 +195,120 @@ function highlightActive(n) {
   document.querySelectorAll('#partList button').forEach((b) => {
     b.classList.toggle('active', parseInt(b.dataset.part, 10) === n);
   });
+}
+
+async function getRefs(n) {
+  if (refsCache.has(n)) return refsCache.get(n);
+  const url = CONFIG.refs.path(n);
+  let data = null;
+  try {
+    const resp = await fetch(url, { cache: 'no-cache' });
+    if (resp.ok) data = await resp.json();
+  } catch {}
+  refsCache.set(n, data);
+  return data;
+}
+
+async function handleRefClick(e) {
+  const target = e.target.closest(CONFIG.refs.selector);
+  if (!target) return;
+  if (!$('content').contains(target)) return;
+  const part = state.currentPart;
+  if (!part) return;
+  e.preventDefault();
+  const key = CONFIG.refs.keyOf(target);
+  if (!key) return;
+  const label = CONFIG.refs.labelOf(target);
+  const refs = await getRefs(part);
+  if (state.currentPart !== part) return;
+  const text = refs && refs[key] ? refs[key] : null;
+  showRefPopup(target, label, text);
+}
+
+function ensurePopup() {
+  if (popup.el) return popup.el;
+  const el = document.createElement('div');
+  el.className = 'popup';
+  el.setAttribute('role', 'dialog');
+  el.setAttribute('aria-modal', 'false');
+  el.setAttribute('tabindex', '-1');
+  el.hidden = true;
+  document.body.appendChild(el);
+  popup.el = el;
+  return el;
+}
+
+function showRefPopup(anchor, label, text) {
+  const el = ensurePopup();
+  if (popup.outsideHandler) {
+    document.removeEventListener('pointerdown', popup.outsideHandler);
+    popup.outsideHandler = null;
+  }
+  el.innerHTML = '';
+  const title = document.createElement('div');
+  title.className = 'popup__title';
+  title.textContent = `Note ${label}`;
+  const body = document.createElement('p');
+  body.className = 'popup__body';
+  body.textContent = text || 'Reference not found in this part.';
+  el.appendChild(title);
+  el.appendChild(body);
+  el.setAttribute('aria-label', `Note ${label}`);
+
+  popup.prevFocus = document.activeElement;
+  el.hidden = false;
+  positionPopup(el, anchor);
+  requestAnimationFrame(() => el.classList.add('show'));
+  el.focus({ preventScroll: true });
+
+  setTimeout(() => {
+    popup.outsideHandler = (ev) => {
+      if (el.contains(ev.target)) return;
+      if (ev.target.closest && ev.target.closest(CONFIG.refs.selector)) return;
+      hidePopup();
+    };
+    document.addEventListener('pointerdown', popup.outsideHandler);
+  }, 0);
+
+  window.addEventListener('scroll', hidePopup, { passive: true, once: true });
+}
+
+function positionPopup(el, anchor) {
+  const margin = 8;
+  const rect = anchor.getBoundingClientRect();
+  el.style.maxWidth = Math.min(280, window.innerWidth - margin * 2) + 'px';
+  el.style.left = '0px';
+  el.style.top = '0px';
+  const pw = el.offsetWidth;
+  const ph = el.offsetHeight;
+
+  let left = rect.left + (rect.width / 2) - (pw / 2);
+  left = Math.max(margin, Math.min(left, window.innerWidth - pw - margin));
+
+  let top = rect.bottom + 6;
+  if (top + ph + margin > window.innerHeight) {
+    const above = rect.top - ph - 6;
+    if (above >= margin) top = above;
+  }
+
+  el.style.left = (left + window.scrollX) + 'px';
+  el.style.top = (top + window.scrollY) + 'px';
+}
+
+function hidePopup() {
+  if (!popup.el || popup.el.hidden) return;
+  const el = popup.el;
+  el.classList.remove('show');
+  setTimeout(() => { el.hidden = true; }, 120);
+
+  if (popup.outsideHandler) {
+    document.removeEventListener('pointerdown', popup.outsideHandler);
+    popup.outsideHandler = null;
+  }
+
+  const prev = popup.prevFocus;
+  popup.prevFocus = null;
+  if (prev && typeof prev.focus === 'function') {
+    try { prev.focus({ preventScroll: true }); } catch {}
+  }
 }
