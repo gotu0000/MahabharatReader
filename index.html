@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1a1a1a">
+  <title>Book Reader</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <button id="sidebarToggle" class="icon-btn" type="button"
+            aria-label="Open parts list" aria-expanded="false" aria-controls="sidebar">
+      <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"
+           fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <line x1="4" y1="6" x2="20" y2="6"/>
+        <line x1="4" y1="12" x2="20" y2="12"/>
+        <line x1="4" y1="18" x2="20" y2="18"/>
+      </svg>
+    </button>
+
+    <h1 class="title">Book Reader</h1>
+
+    <div class="controls">
+      <label class="font-size">
+        <span class="font-size__label" aria-hidden="true">A</span>
+        <input id="fontSize" type="range" min="14" max="28" step="1"
+               aria-label="Body font size in pixels">
+      </label>
+
+      <button id="themeToggle" class="icon-btn" type="button" aria-label="Switch to light theme">
+        <svg class="theme-icon theme-icon--sun" viewBox="0 0 24 24" width="22" height="22"
+             aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <circle cx="12" cy="12" r="4"/>
+          <line x1="12" y1="2" x2="12" y2="5"/>
+          <line x1="12" y1="19" x2="12" y2="22"/>
+          <line x1="2" y1="12" x2="5" y2="12"/>
+          <line x1="19" y1="12" x2="22" y2="12"/>
+          <line x1="4.5" y1="4.5" x2="6.5" y2="6.5"/>
+          <line x1="17.5" y1="17.5" x2="19.5" y2="19.5"/>
+          <line x1="4.5" y1="19.5" x2="6.5" y2="17.5"/>
+          <line x1="17.5" y1="6.5" x2="19.5" y2="4.5"/>
+        </svg>
+        <svg class="theme-icon theme-icon--moon" viewBox="0 0 24 24" width="22" height="22"
+             aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <aside id="sidebar" class="sidebar" aria-label="Parts">
+    <nav>
+      <ul id="partList" class="part-list"></ul>
+    </nav>
+  </aside>
+
+  <div id="overlay" class="overlay" hidden></div>
+
+  <main id="reader" class="reader" tabindex="-1">
+    <article id="content" class="content">
+      <p class="hint">Open the menu to choose a part.</p>
+    </article>
+  </main>
+
+  <script src="js/reader.js"></script>
+</body>
+</html>
