@@ -1,7 +1,8 @@
 # Book Reader Web App
 
-A personal, mobile-first reader for a 2,773-page book that has been split into
-10 parts. Hosted as a static site on GitHub Pages. Built for reading on a phone.
+A personal, mobile-first reader for the Bibek Debroy English translation
+of the Mahabharata (Penguin 10-volume edition). Hosted as a static site
+on GitHub Pages. Built for reading on a phone.
 
 ## Goal
 
@@ -9,11 +10,12 @@ Replace generic PDF readers with a custom reader that has:
 
 1. Comfortable dark theme by default, with a light/dark toggle.
 1. Font-size control that actually changes the body text.
-1. Sidebar navigation between the 10 parts.
-1. Last-read position remembered per part.
+1. Two-level sidebar navigation: 10 parts (volumes) → multiple parvas
+   (sections) inside each part.
+1. Last-read position remembered per parva.
 1. **Dictionary lookup** popup when the user selects a word.
 1. **Reference lookup** popup when the user selects an in-book reference
-   (a marker like `[12]` whose definition lives in the part’s footnotes).
+   (a marker like `12` whose definition lives in the parva’s footnotes).
 
 The reader is for one person on one phone. No accounts, no sync, no analytics.
 
@@ -35,97 +37,145 @@ The reader is for one person on one phone. No accounts, no sync, no analytics.
 ## Repo layout
 
 ```
-/index.html              Reader shell (sidebar + main pane + header controls)
-/css/styles.css          All styles. Use CSS variables for theme tokens.
-/js/reader.js            All logic. Single file is fine.
-/parts/                  Converted book content (added separately, may be empty at first)
-  part-01.html
-  part-02.html
-  ...
-  part-10.html
-/parts/refs/             Per-part reference lookup tables
-  part-01.json           { "[12]": "Referenced footnote text...", ... }
-  ...
-/assets/                 Icons, any images
-/CLAUDE.md               This file
-/README.md               Short human-readable description
+/index.html                         Reader shell
+/css/styles.css                     All styles
+/js/reader.js                       All logic
+/parts/
+  index.json                        Top-level manifest of the 10 parts
+  part-01/
+    index.json                      Manifest of parvas inside Part 1
+    section-01.html                 Anukramanika Parva
+    section-02.html                 Parvasamgraha Parva
+    ...
+    section-15.html
+  part-02/
+    index.json
+    section-01.html
+    ...
+  refs/
+    part-01/
+      section-01.json               Footnote map for Part 1's Anukramanika Parva
+      section-02.json
+      ...
+/assets/                            Icons, any images
+/CLAUDE.md
+/README.md
 ```
 
-If `/parts/` is empty or a specific part is missing, the reader must show a
-graceful “Part not yet available” message — never a broken page.
+A part’s `index.json` looks like:
+
+```json
+{
+  "part": 1,
+  "sections": [
+    {
+      "number": 1,
+      "name": "Section One",
+      "parva": "Anukramanika Parva",
+      "chapters": [1],
+      "html": "part-01/section-01.html",
+      "refs": "refs/part-01/section-01.json",
+      "footnote_count": 86
+    },
+    ...
+  ]
+}
+```
+
+A footnote-refs JSON file is a flat map keyed by inline marker:
+
+```json
+{
+  "fn1": "The word 'jaya' means victory and was also the title of...",
+  "fn2": "Nara and Narayana were ancient sages...",
+  ...
+}
+```
+
+Inline markers in the HTML look like:
+
+```html
+<sup class="ref" data-ref="fn12">12</sup>
+```
+
+The reader looks up `data-ref` against the **currently loaded parva’s**
+refs file. Each parva is a self-contained footnote namespace — numbers
+restart at 1 inside each section file, matching the source book’s
+footnote numbering exactly.
+
+If `parts/part-NN/` is missing or a specific section is missing, the
+reader must show “Not yet available” — never a broken page.
 
 -----
 
 ## Features in build order
 
-### Phase 1 — Reader shell (build first)
+### Phase 1 — Reader shell
 
-- Header bar with: title, light/dark toggle, font-size slider (range 14–28 px).
-- Collapsible sidebar listing Part 1 through Part 10. Tap loads that part’s
-  HTML into the main pane via `fetch()`.
-- Main pane renders the loaded HTML. Reading area max-width ~700 px, generous
-  line-height (1.6–1.8), comfortable side padding on mobile.
-- Persist these to localStorage (keys prefixed `reader_`):
+- Header bar: title, light/dark toggle, font-size slider (range 14–28 px).
+- Two-level sidebar:
+  - Top level: 10 parts. Tap to expand and see that part’s parvas.
+  - Inner level: parvas, listed by parva name from the part’s `index.json`.
+  - Tap a parva to load its HTML into the main pane via `fetch()`.
+- Main pane renders the loaded HTML. Reading area max-width ~700 px,
+  generous line-height (1.6–1.8), comfortable side padding on mobile.
+- localStorage keys (all prefixed `reader_`):
   - `reader_theme` — `"dark"` or `"light"` (default `"dark"`)
   - `reader_fontSize` — integer px (default 18)
-  - `reader_lastPart` — last-opened part id
-  - `reader_pos_part_NN` — scroll position per part (number, 0–1 fraction)
+  - `reader_lastParva` — `"01/05"` (part 1, section 5) — reopen on launch
+  - `reader_pos_01_05` — scroll position (0–1 fraction) per parva
 
 ### Phase 2 — Dictionary lookup
 
-- On text selection (works for both desktop drag-select and mobile long-press
-  selection), if the selection is a single word (1–2 words, alphabetic),
-  show a small floating popup near the selection.
-- Popup fetches `https://api.dictionaryapi.dev/api/v2/entries/en/{word}` and
-  displays: word, part of speech, first 1–2 definitions. Show a tiny loading
+- On text selection (drag-select or mobile long-press), if the selection
+  is a single word (1–2 words, alphabetic), show a small floating popup
+  near the selection.
+- Popup fetches `https://api.dictionaryapi.dev/api/v2/entries/en/{word}`
+  and displays: word, part of speech, first 1–2 definitions. Tiny loading
   state while fetching.
-- Tap outside the popup, press ESC, or scroll dismisses it.
-- Cache responses in-memory for the session to avoid refetching the same word.
-- If the API returns 404 (no entry), show “No definition found” — don’t crash.
+- Tap outside, ESC, or scroll dismisses it.
+- Cache responses in-memory for the session.
+- 404 from the API → “No definition found.” Don’t crash.
 
 ### Phase 3 — Reference lookup
 
-- If the selected text matches a reference pattern (configurable; default
-  patterns: `[\d+]` like `[12]`, `[\d+a-z]` like `[12a]`), look it up in the
-  current part’s `/parts/refs/part-NN.json` instead of hitting the dictionary.
-- Same popup UI; show the referenced text. If not found, show “Reference not
-  found in this part.”
-- The reference patterns and the JSON file format must be configurable in one
-  place at the top of `reader.js` so I can adjust them once the actual book’s
-  pattern is known.
+- If the selected text matches the reference pattern (digits only, e.g.
+  `12`, `345`), look it up in the **currently loaded parva’s** refs JSON
+  (already fetched and cached when the parva was loaded). Same popup UI.
+- Tapping a `<sup class="ref">` element directly should also trigger the
+  popup — selection on a small superscript is fiddly on mobile.
+- Reference pattern configurable at the top of `reader.js`.
 
 -----
 
 ## Style / UX
 
-- **Dark theme palette:** background `#1a1a1a`, body text `#d4d4d4`,
-  popup surface `#2a2a2a`, accent `#7aa2f7`. Don’t use pure black or pure white.
-- **Light theme palette:** background `#fafaf7`, body text `#1a1a1a`, accent
-  `#3563b8`.
-- **Typography:** serif for body (Georgia / “Iowan Old Style” / serif fallback),
+- **Dark palette:** background `#1a1a1a`, body text `#d4d4d4`, popup
+  surface `#2a2a2a`, accent `#7aa2f7`. Avoid pure black/white.
+- **Light palette:** background `#fafaf7`, body text `#1a1a1a`, accent `#3563b8`.
+- **Typography:** serif body (Georgia / “Iowan Old Style” / serif),
   system sans for UI chrome.
-- **Popup:** small (~280 px max width), rounded corners, subtle shadow, fades
-  in. Positioned to stay on screen (flip above selection if near bottom).
-- **No animations on text.** Only the popup fades; the reader itself is still.
+- **Popup:** ~280 px max width, rounded, subtle shadow, fade-in,
+  flips above the selection if near bottom of viewport.
+- Reader text itself does not animate.
 
 -----
 
 ## Accessibility
 
-- Proper `aria-label` on every icon-only button.
-- Popup is focusable; ESC closes; focus returns to where it was.
-- Sidebar toggle button has visible focus ring.
+- `aria-label` on every icon-only button.
+- Popup focusable; ESC closes; focus returns.
+- Sidebar toggle has visible focus ring.
 - Body text passes WCAG AA contrast on both themes.
 
 -----
 
 ## Things to remember every session
 
-- I am working from a phone via Claude Code on the web. Push directly to `main`
-  unless the change is risky enough to deserve a PR. GitHub Pages auto-deploys
-  from `main`.
+- I am working from a phone via Claude Code on the web. Push directly
+  to `main`. GitHub Pages auto-deploys from `main`.
 - Keep commits small and descriptive.
-- Before finishing a task, sanity-check the deployed URL would work (no broken
-  relative paths, no `localhost` references, no console errors expected).
-- If a feature would require breaking a hard constraint above, stop and ask
-  instead of working around it.
+- Verify deployed paths are relative (no `localhost`, no leading `/`
+  that would break under `/repo-name/` Pages hosting).
+- If a feature would require breaking a hard constraint above, stop
+  and ask instead of working around it.
