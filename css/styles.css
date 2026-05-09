@@ -197,6 +197,12 @@ body {
 .content img { max-width: 100%; height: auto; }
 .content a { color: var(--accent); }
 
+.content .chapter,
+.content .parva {
+  content-visibility: auto;
+  contain-intrinsic-size: 1px 1200px;
+}
+
 .content [data-ref] {
   cursor: pointer;
   color: var(--accent);
