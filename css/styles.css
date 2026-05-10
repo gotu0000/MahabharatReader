@@ -256,6 +256,25 @@ body {
   flex: 1 1 auto;
 }
 
+.parva-list__badge {
+  flex: 0 0 auto;
+  margin-left: 0.5rem;
+  padding: 0.05rem 0.4rem;
+  border-radius: 999px;
+  background: var(--border);
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  opacity: 0.8;
+}
+
+.parva-list button.active .parva-list__badge {
+  background: transparent;
+  color: var(--accent);
+  opacity: 1;
+}
+
 .parva-empty {
   padding: 0.5rem 0.85rem;
   font-size: 0.85rem;

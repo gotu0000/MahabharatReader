@@ -187,6 +187,37 @@ function setSidebar(open) {
   $('overlay').hidden = !open;
   $('sidebarToggle').setAttribute('aria-expanded', String(open));
   $('sidebarToggle').setAttribute('aria-label', open ? 'Close parts list' : 'Open parts list');
+  if (open) refreshProgressBadges();
+}
+
+function refreshProgressBadges() {
+  document.querySelectorAll('.parva-list button').forEach((btn) => {
+    const badge = btn.querySelector('.parva-list__badge');
+    if (!badge) return;
+    const part = parseInt(btn.dataset.part, 10);
+    const section = parseInt(btn.dataset.section, 10);
+    updateProgressBadge(badge, part, section);
+  });
+}
+
+function updateProgressBadge(badge, part, section) {
+  const raw = parseFloat(localStorage.getItem(STORAGE.pos(part, section)) || '');
+  const frac = Number.isFinite(raw) ? Math.min(1, Math.max(0, raw)) : 0;
+  if (frac < 0.01) {
+    badge.textContent = '';
+    badge.hidden = true;
+    badge.removeAttribute('aria-label');
+    return;
+  }
+  const pct = Math.round(frac * 100);
+  if (pct >= 99) {
+    badge.textContent = '✓';
+    badge.setAttribute('aria-label', 'Read');
+  } else {
+    badge.textContent = `${pct}%`;
+    badge.setAttribute('aria-label', `${pct} percent read`);
+  }
+  badge.hidden = false;
 }
 
 async function togglePart(n) {
@@ -236,8 +267,13 @@ function renderParvaList(list, partNum, manifest) {
     const name = document.createElement('span');
     name.className = 'parva-list__name';
     name.textContent = section.parva || section.name || `Section ${section.number}`;
+    const badge = document.createElement('span');
+    badge.className = 'parva-list__badge';
+    badge.hidden = true;
+    updateProgressBadge(badge, partNum, section.number);
     btn.appendChild(num);
     btn.appendChild(name);
+    btn.appendChild(badge);
     btn.addEventListener('click', () => {
       loadParva(partNum, section.number);
       closeSidebar();
