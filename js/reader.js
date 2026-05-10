@@ -1,11 +1,13 @@
-// Reader configuration. Phase 2/3 will read more from here.
+// Reader configuration. Tweak in one place.
 const CONFIG = {
   partCount: 10,
   fontSize: { min: 14, max: 28, default: 18 },
   defaultTheme: 'dark',
+  topManifest: 'parts/index.json',
+  partManifest: (n) => `parts/part-${pad2(n)}/index.json`,
+  resolveUnderParts: (rel) => `parts/${rel}`,
   refs: {
     selector: '[data-ref]',
-    path: (n) => `parts/refs/part-${pad2(n)}.json`,
     keyOf: (el) => el.getAttribute('data-ref'),
     labelOf: (el) => el.textContent.trim() || el.getAttribute('data-ref'),
   },
@@ -14,15 +16,17 @@ const CONFIG = {
 const STORAGE = {
   theme: 'reader_theme',
   fontSize: 'reader_fontSize',
-  lastPart: 'reader_lastPart',
-  pos: (n) => `reader_pos_part_${pad2(n)}`,
+  lastParva: 'reader_lastParva',
+  pos: (part, section) => `reader_pos_${pad2(part)}_${pad2(section)}`,
 };
 
 const state = {
   currentPart: null,
+  currentSection: null,
   scrollSaveTimer: null,
 };
 
+const partManifests = new Map();
 const refsCache = new Map();
 const popup = {
   el: null,
@@ -46,10 +50,22 @@ function init() {
   buildPartList();
   wireUI();
 
-  const last = parseInt(localStorage.getItem(STORAGE.lastPart) || '', 10);
-  if (Number.isInteger(last) && last >= 1 && last <= CONFIG.partCount) {
-    loadPart(last);
+  const last = parseLastParva(localStorage.getItem(STORAGE.lastParva));
+  if (last) {
+    expandPart(last.part);
+    loadParva(last.part, last.section);
   }
+}
+
+function parseLastParva(raw) {
+  if (!raw) return null;
+  const m = /^(\d{1,2})\/(\d{1,3})$/.exec(raw);
+  if (!m) return null;
+  const part = parseInt(m[1], 10);
+  const section = parseInt(m[2], 10);
+  if (!Number.isInteger(part) || part < 1 || part > CONFIG.partCount) return null;
+  if (!Number.isInteger(section) || section < 1) return null;
+  return { part, section };
 }
 
 function readStoredFontSize() {
@@ -60,17 +76,35 @@ function readStoredFontSize() {
 
 function buildPartList() {
   const ul = $('partList');
+  ul.innerHTML = '';
   for (let n = 1; n <= CONFIG.partCount; n++) {
     const li = document.createElement('li');
+    li.className = 'part-item';
+    li.dataset.part = String(n);
+
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.textContent = `Part ${n}`;
-    btn.dataset.part = String(n);
-    btn.addEventListener('click', () => {
-      loadPart(n);
-      closeSidebar();
-    });
+    btn.className = 'part-toggle';
+    btn.setAttribute('aria-expanded', 'false');
+
+    const chevron = document.createElement('span');
+    chevron.className = 'part-toggle__chevron';
+    chevron.setAttribute('aria-hidden', 'true');
+    btn.appendChild(chevron);
+
+    const label = document.createElement('span');
+    label.className = 'part-toggle__label';
+    label.textContent = `Part ${n}`;
+    btn.appendChild(label);
+
+    btn.addEventListener('click', () => togglePart(n));
+
+    const sub = document.createElement('ul');
+    sub.className = 'parva-list';
+    sub.hidden = true;
+
     li.appendChild(btn);
+    li.appendChild(sub);
     ul.appendChild(li);
   }
 }
@@ -140,8 +174,7 @@ function applyFontSize(px) {
 
 function toggleSidebar() {
   const sb = $('sidebar');
-  const open = !sb.classList.contains('open');
-  setSidebar(open);
+  setSidebar(!sb.classList.contains('open'));
 }
 
 function closeSidebar() {
@@ -156,36 +189,122 @@ function setSidebar(open) {
   $('sidebarToggle').setAttribute('aria-label', open ? 'Close parts list' : 'Open parts list');
 }
 
-async function loadPart(n) {
-  const id = pad2(n);
-  const url = `parts/part-${id}.html`;
-  const content = $('content');
+async function togglePart(n) {
+  const item = document.querySelector(`.part-item[data-part="${n}"]`);
+  if (!item) return;
+  const btn = item.querySelector('.part-toggle');
+  const list = item.querySelector('.parva-list');
+  const open = btn.getAttribute('aria-expanded') !== 'true';
+  btn.setAttribute('aria-expanded', String(open));
+  list.hidden = !open;
+  if (open && !list.dataset.loaded) {
+    list.dataset.loaded = '1';
+    list.innerHTML = '<li class="parva-empty">Loading…</li>';
+    const manifest = await getPartManifest(n);
+    renderParvaList(list, n, manifest);
+  }
+}
 
-  hidePopup();
-  state.currentPart = n;
-  localStorage.setItem(STORAGE.lastPart, String(n));
-  highlightActive(n);
+async function expandPart(n) {
+  const item = document.querySelector(`.part-item[data-part="${n}"]`);
+  if (!item) return;
+  const btn = item.querySelector('.part-toggle');
+  if (btn.getAttribute('aria-expanded') === 'true') return;
+  await togglePart(n);
+}
 
-  content.innerHTML = '<p class="hint">Loading…</p>';
+function renderParvaList(list, partNum, manifest) {
+  list.innerHTML = '';
+  const sections = manifest && Array.isArray(manifest.sections) ? manifest.sections : [];
+  if (sections.length === 0) {
+    const li = document.createElement('li');
+    li.className = 'parva-empty';
+    li.textContent = 'Not yet available';
+    list.appendChild(li);
+    return;
+  }
+  for (const section of sections) {
+    if (!Number.isInteger(section.number)) continue;
+    const li = document.createElement('li');
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.dataset.part = String(partNum);
+    btn.dataset.section = String(section.number);
+    const num = document.createElement('span');
+    num.className = 'parva-list__num';
+    num.textContent = String(section.number);
+    const name = document.createElement('span');
+    name.className = 'parva-list__name';
+    name.textContent = section.parva || section.name || `Section ${section.number}`;
+    btn.appendChild(num);
+    btn.appendChild(name);
+    btn.addEventListener('click', () => {
+      loadParva(partNum, section.number);
+      closeSidebar();
+    });
+    li.appendChild(btn);
+    list.appendChild(li);
+  }
+  if (state.currentPart === partNum && state.currentSection != null) {
+    highlightActive(state.currentPart, state.currentSection);
+  }
+}
 
-  let html;
+async function getPartManifest(n) {
+  if (partManifests.has(n)) return partManifests.get(n);
+  const url = CONFIG.partManifest(n);
+  let data = null;
   try {
     const resp = await fetch(url, { cache: 'no-cache' });
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    html = await resp.text();
-  } catch (err) {
-    content.innerHTML = `<p class="hint">Part ${n} not yet available.</p>`;
-    window.scrollTo(0, 0);
+    if (resp.ok) data = await resp.json();
+  } catch {}
+  partManifests.set(n, data);
+  return data;
+}
+
+async function loadParva(part, section) {
+  const content = $('content');
+  hidePopup();
+  state.currentPart = part;
+  state.currentSection = section;
+  localStorage.setItem(STORAGE.lastParva, `${pad2(part)}/${pad2(section)}`);
+  highlightActive(part, section);
+
+  const manifest = await getPartManifest(part);
+  if (state.currentPart !== part || state.currentSection !== section) return;
+  const sec = manifest && Array.isArray(manifest.sections)
+    ? manifest.sections.find((s) => s.number === section)
+    : null;
+  if (!sec || !sec.html) {
+    showNotAvailable(part, section);
     return;
   }
 
+  content.innerHTML = '<p class="hint">Loading…</p>';
+  let html;
+  try {
+    const resp = await fetch(CONFIG.resolveUnderParts(sec.html), { cache: 'no-cache' });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    html = await resp.text();
+  } catch {
+    showNotAvailable(part, section);
+    return;
+  }
+  if (state.currentPart !== part || state.currentSection !== section) return;
+
   content.innerHTML = html;
-  restoreScroll(n);
-  getRefs(n);
+  restoreScroll(part, section);
+  if (sec.refs) getRefsFor(part, section);
 }
 
-function restoreScroll(n) {
-  const saved = parseFloat(localStorage.getItem(STORAGE.pos(n)) || '0');
+function showNotAvailable(part, section) {
+  const content = $('content');
+  content.innerHTML = `<p class="hint">Part ${part}, Section ${section} not yet available.</p>`;
+  window.scrollTo(0, 0);
+}
+
+function restoreScroll(part, section) {
+  const saved = parseFloat(localStorage.getItem(STORAGE.pos(part, section)) || '0');
   const frac = Number.isFinite(saved) ? Math.min(1, Math.max(0, saved)) : 0;
   requestAnimationFrame(() => {
     const max = document.documentElement.scrollHeight - window.innerHeight;
@@ -194,33 +313,50 @@ function restoreScroll(n) {
 }
 
 function onScroll() {
-  if (!state.currentPart) return;
+  if (state.currentPart == null || state.currentSection == null) return;
   if (state.scrollSaveTimer) return;
   state.scrollSaveTimer = setTimeout(() => {
     state.scrollSaveTimer = null;
     const part = state.currentPart;
-    if (!part) return;
+    const section = state.currentSection;
+    if (part == null || section == null) return;
     const max = document.documentElement.scrollHeight - window.innerHeight;
     const frac = max > 0 ? window.scrollY / max : 0;
-    localStorage.setItem(STORAGE.pos(part), frac.toFixed(4));
+    localStorage.setItem(STORAGE.pos(part, section), frac.toFixed(4));
   }, 250);
 }
 
-function highlightActive(n) {
-  document.querySelectorAll('#partList button').forEach((b) => {
-    b.classList.toggle('active', parseInt(b.dataset.part, 10) === n);
+function highlightActive(part, section) {
+  document.querySelectorAll('.part-item').forEach((item) => {
+    const p = parseInt(item.dataset.part, 10);
+    const isCurrent = p === part;
+    const toggle = item.querySelector('.part-toggle');
+    if (toggle) toggle.classList.toggle('part-toggle--current', isCurrent);
+  });
+  document.querySelectorAll('.parva-list button').forEach((b) => {
+    const p = parseInt(b.dataset.part, 10);
+    const s = parseInt(b.dataset.section, 10);
+    b.classList.toggle('active', p === part && s === section);
   });
 }
 
-async function getRefs(n) {
-  if (refsCache.has(n)) return refsCache.get(n);
-  const url = CONFIG.refs.path(n);
+async function getRefsFor(part, section) {
+  const key = `${part}/${section}`;
+  if (refsCache.has(key)) return refsCache.get(key);
+  const manifest = await getPartManifest(part);
+  const sec = manifest && Array.isArray(manifest.sections)
+    ? manifest.sections.find((s) => s.number === section)
+    : null;
+  if (!sec || !sec.refs) {
+    refsCache.set(key, null);
+    return null;
+  }
   let data = null;
   try {
-    const resp = await fetch(url, { cache: 'no-cache' });
+    const resp = await fetch(CONFIG.resolveUnderParts(sec.refs), { cache: 'no-cache' });
     if (resp.ok) data = await resp.json();
   } catch {}
-  refsCache.set(n, data);
+  refsCache.set(key, data);
   return data;
 }
 
@@ -229,13 +365,14 @@ async function handleRefClick(e) {
   if (!target) return;
   if (!$('content').contains(target)) return;
   const part = state.currentPart;
-  if (!part) return;
+  const section = state.currentSection;
+  if (part == null || section == null) return;
   e.preventDefault();
   const key = CONFIG.refs.keyOf(target);
   if (!key) return;
   const label = CONFIG.refs.labelOf(target);
-  const refs = await getRefs(part);
-  if (state.currentPart !== part) return;
+  const refs = await getRefsFor(part, section);
+  if (state.currentPart !== part || state.currentSection !== section) return;
   const text = refs && refs[key] ? refs[key] : null;
   showRefPopup(target, label, text);
 }
@@ -265,7 +402,7 @@ function showRefPopup(anchor, label, text) {
   title.textContent = `Note ${label}`;
   const body = document.createElement('p');
   body.className = 'popup__body';
-  body.textContent = text || 'Reference not found in this part.';
+  body.textContent = text || 'Reference not found in this parva.';
   el.appendChild(title);
   el.appendChild(body);
   el.setAttribute('aria-label', `Note ${label}`);
