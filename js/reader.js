@@ -896,7 +896,11 @@ async function handleRefClick(e) {
   const label = CONFIG.refs.labelOf(target);
   const refs = await getRefsFor(part, section);
   if (state.currentPart !== part || state.currentSection !== section) return;
-  const text = refs && refs[key] ? refs[key] : null;
+  const text = refs
+    && Object.prototype.hasOwnProperty.call(refs, key)
+    && typeof refs[key] === 'string'
+    ? refs[key]
+    : null;
   showRefPopup(target, label, text);
 }
 
