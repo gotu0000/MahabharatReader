@@ -1,0 +1,14 @@
+{
+  "parts": [
+    { "number": 1, "manifest": "part-01/index.json" },
+    { "number": 2, "manifest": "part-02/index.json" },
+    { "number": 3, "manifest": "part-03/index.json" },
+    { "number": 4, "manifest": "part-04/index.json" },
+    { "number": 5, "manifest": "part-05/index.json" },
+    { "number": 6, "manifest": "part-06/index.json" },
+    { "number": 7, "manifest": "part-07/index.json" },
+    { "number": 8, "manifest": "part-08/index.json" },
+    { "number": 9, "manifest": "part-09/index.json" },
+    { "number": 10, "manifest": "part-10/index.json" }
+  ]
+}
