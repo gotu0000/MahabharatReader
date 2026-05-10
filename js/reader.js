@@ -24,6 +24,8 @@ const state = {
   currentPart: null,
   currentSection: null,
   scrollSaveTimer: null,
+  pageIndicatorRaf: 0,
+  pageIndicatorHideTimer: 0,
 };
 
 const partManifests = new Map();
@@ -162,7 +164,11 @@ function wireUI() {
     if (!fontSizeRaf) {
       fontSizeRaf = requestAnimationFrame(() => {
         fontSizeRaf = 0;
-        if (pendingFontSize != null) applyFontSize(pendingFontSize);
+        if (pendingFontSize != null) {
+          applyFontSize(pendingFontSize);
+          updatePageIndicator();
+          showPageIndicator();
+        }
       });
     }
     if (fontSizeSaveTimer) clearTimeout(fontSizeSaveTimer);
@@ -175,12 +181,32 @@ function wireUI() {
   });
 
   window.addEventListener('scroll', onScroll, { passive: true });
+  window.addEventListener('resize', () => {
+    updatePageIndicator();
+  });
 
   $('content').addEventListener('click', handleRefClick);
 
+  $('reader').addEventListener('pointerdown', (e) => {
+    if (e.target.closest('.page-indicator, .jump-popup')) return;
+    showPageIndicator();
+  }, { passive: true });
+
+  $('pageIndicator').addEventListener('click', openJumpPopup);
+  $('jumpForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    submitJump();
+  });
+  $('jumpPopup').addEventListener('click', (e) => {
+    if (e.target.closest('[data-jump-close]')) closeJumpPopup();
+  });
+
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
-    if (popup.el && !popup.el.hidden) {
+    const jp = $('jumpPopup');
+    if (jp && !jp.hidden) {
+      closeJumpPopup();
+    } else if (popup.el && !popup.el.hidden) {
       hidePopup();
     } else {
       closeSidebar();
@@ -365,10 +391,17 @@ async function loadParva(part, section) {
   });
   renderParvaNav(part, section, manifest);
   restoreScroll(part, section);
+  enablePageIndicator();
+  requestAnimationFrame(() => {
+    updatePageIndicator();
+    showPageIndicator();
+  });
   if (sec.refs) getRefsFor(part, section);
 }
 
 function showNotAvailable(part, section, manifest) {
+  closeJumpPopup();
+  disablePageIndicator();
   const content = $('content');
   content.innerHTML = '';
 
@@ -412,6 +445,8 @@ function goHome() {
 
 function renderHome() {
   hidePopup();
+  closeJumpPopup();
+  disablePageIndicator();
   clearParvaNav();
   state.currentPart = null;
   state.currentSection = null;
@@ -552,6 +587,118 @@ async function hydrateContinueCard(slot, last) {
   slot.appendChild(card);
 }
 
+function pageInfo() {
+  const article = $('content');
+  const ph = window.innerHeight;
+  if (!article || ph <= 0) return null;
+  if (state.currentPart == null || state.currentSection == null) return null;
+  const top = article.offsetTop;
+  const height = article.offsetHeight;
+  if (height <= 0) return null;
+  const total = Math.max(1, Math.ceil(height / ph));
+  const scrolled = Math.max(0, window.scrollY - top);
+  const current = Math.min(total, Math.max(1, Math.floor(scrolled / ph) + 1));
+  return { current, total };
+}
+
+function enablePageIndicator() {
+  const pill = $('pageIndicator');
+  if (!pill) return;
+  pill.dataset.disabled = '';
+  pill.hidden = false;
+}
+
+function disablePageIndicator() {
+  const pill = $('pageIndicator');
+  if (!pill) return;
+  pill.dataset.disabled = '1';
+  pill.classList.add('page-indicator--hidden');
+  pill.hidden = true;
+  if (state.pageIndicatorHideTimer) {
+    clearTimeout(state.pageIndicatorHideTimer);
+    state.pageIndicatorHideTimer = 0;
+  }
+}
+
+function updatePageIndicator() {
+  const pill = $('pageIndicator');
+  const text = $('pageIndicatorText');
+  if (!pill || !text) return;
+  if (pill.dataset.disabled === '1') return;
+  const info = pageInfo();
+  if (!info) return;
+  text.textContent = `${info.current} / ${info.total}`;
+  pill.setAttribute('aria-label', `Page ${info.current} of ${info.total}. Jump to page.`);
+}
+
+function showPageIndicator() {
+  const pill = $('pageIndicator');
+  if (!pill || pill.dataset.disabled === '1') return;
+  pill.classList.remove('page-indicator--hidden');
+  if (state.pageIndicatorHideTimer) clearTimeout(state.pageIndicatorHideTimer);
+  state.pageIndicatorHideTimer = setTimeout(() => {
+    state.pageIndicatorHideTimer = 0;
+    pill.classList.add('page-indicator--hidden');
+  }, 1500);
+}
+
+function jumpToPage(n) {
+  const article = $('content');
+  if (!article) return;
+  const ph = window.innerHeight;
+  if (ph <= 0) return;
+  const info = pageInfo();
+  if (!info) return;
+  const clamped = Math.min(info.total, Math.max(1, n));
+  const top = article.offsetTop + (clamped - 1) * ph;
+  window.scrollTo({ top, behavior: 'smooth' });
+}
+
+function openJumpPopup() {
+  const info = pageInfo();
+  if (!info) return;
+  const popupEl = $('jumpPopup');
+  const input = $('jumpInput');
+  const total = $('jumpTotal');
+  if (!popupEl || !input || !total) return;
+  hidePopup();
+  input.max = String(info.total);
+  input.value = String(info.current);
+  total.textContent = `of ${info.total}`;
+  popupEl.hidden = false;
+  requestAnimationFrame(() => {
+    input.focus({ preventScroll: true });
+    input.select();
+  });
+}
+
+function closeJumpPopup() {
+  const popupEl = $('jumpPopup');
+  if (!popupEl || popupEl.hidden) return;
+  popupEl.hidden = true;
+  const pill = $('pageIndicator');
+  if (pill && pill.dataset.disabled !== '1') {
+    pill.focus({ preventScroll: true });
+    showPageIndicator();
+  }
+}
+
+function submitJump() {
+  const input = $('jumpInput');
+  if (!input) return;
+  const raw = parseInt(input.value, 10);
+  if (!Number.isFinite(raw)) {
+    closeJumpPopup();
+    return;
+  }
+  jumpToPage(raw);
+  closeJumpPopup();
+  requestAnimationFrame(() => {
+    updatePageIndicator();
+    showPageIndicator();
+  });
+}
+
 function updateHeader(opts) {
   const titleEl = $('title');
   const metaEl = $('titleMeta');
@@ -683,6 +830,13 @@ function restoreScroll(part, section) {
 
 function onScroll() {
   if (state.currentPart == null || state.currentSection == null) return;
+  if (!state.pageIndicatorRaf) {
+    state.pageIndicatorRaf = requestAnimationFrame(() => {
+      state.pageIndicatorRaf = 0;
+      updatePageIndicator();
+      showPageIndicator();
+    });
+  }
   if (state.scrollSaveTimer) return;
   state.scrollSaveTimer = setTimeout(() => {
     state.scrollSaveTimer = null;
