@@ -61,14 +61,6 @@ body {
   flex-direction: column;
   justify-content: center;
   line-height: 1.15;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-  border-radius: 6px;
-}
-
-.title-block:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
 }
 
 .title {

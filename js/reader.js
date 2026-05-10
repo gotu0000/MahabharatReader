@@ -178,17 +178,6 @@ function wireUI() {
 
   $('content').addEventListener('click', handleRefClick);
 
-  const tb = $('titleBlock');
-  if (tb) {
-    tb.addEventListener('click', goHome);
-    tb.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        goHome();
-      }
-    });
-  }
-
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
     if (popup.el && !popup.el.hidden) {
