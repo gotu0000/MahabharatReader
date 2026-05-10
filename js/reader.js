@@ -54,6 +54,8 @@ function init() {
   if (last) {
     expandPart(last.part);
     loadParva(last.part, last.section);
+  } else {
+    renderHome();
   }
 }
 
@@ -77,6 +79,33 @@ function readStoredFontSize() {
 function buildPartList() {
   const ul = $('partList');
   ul.innerHTML = '';
+
+  const homeLi = document.createElement('li');
+  homeLi.className = 'part-list__home';
+  const homeBtn = document.createElement('button');
+  homeBtn.type = 'button';
+  homeBtn.className = 'home-link';
+  const homeIcon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  homeIcon.setAttribute('class', 'home-link__icon');
+  homeIcon.setAttribute('viewBox', '0 0 24 24');
+  homeIcon.setAttribute('fill', 'none');
+  homeIcon.setAttribute('stroke', 'currentColor');
+  homeIcon.setAttribute('stroke-width', '2');
+  homeIcon.setAttribute('stroke-linecap', 'round');
+  homeIcon.setAttribute('stroke-linejoin', 'round');
+  homeIcon.setAttribute('aria-hidden', 'true');
+  homeIcon.innerHTML = '<path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v9h14v-9"/>';
+  const homeLabel = document.createElement('span');
+  homeLabel.textContent = 'Home';
+  homeBtn.appendChild(homeIcon);
+  homeBtn.appendChild(homeLabel);
+  homeBtn.addEventListener('click', () => {
+    goHome();
+    closeSidebar();
+  });
+  homeLi.appendChild(homeBtn);
+  ul.appendChild(homeLi);
+
   for (let n = 1; n <= CONFIG.partCount; n++) {
     const li = document.createElement('li');
     li.className = 'part-item';
@@ -148,6 +177,17 @@ function wireUI() {
   window.addEventListener('scroll', onScroll, { passive: true });
 
   $('content').addEventListener('click', handleRefClick);
+
+  const tb = $('titleBlock');
+  if (tb) {
+    tb.addEventListener('click', goHome);
+    tb.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        goHome();
+      }
+    });
+  }
 
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
@@ -250,7 +290,7 @@ function renderParvaList(list, partNum, manifest) {
   if (sections.length === 0) {
     const li = document.createElement('li');
     li.className = 'parva-empty';
-    li.textContent = 'Not yet available';
+    li.textContent = 'Coming soon';
     list.appendChild(li);
     return;
   }
@@ -341,14 +381,186 @@ async function loadParva(part, section) {
 
 function showNotAvailable(part, section, manifest) {
   const content = $('content');
-  content.innerHTML = `<p class="hint">Part ${part}, Section ${section} not yet available.</p>`;
-  updateHeader({ title: 'Not yet available', meta: `Part ${part} · Section ${section}` });
-  if (manifest && Array.isArray(manifest.sections)) {
+  content.innerHTML = '';
+
+  const card = document.createElement('div');
+  card.className = 'coming-soon-card';
+
+  const heading = document.createElement('h2');
+  heading.className = 'coming-soon-card__title';
+  heading.textContent = 'Coming soon';
+  card.appendChild(heading);
+
+  const body = document.createElement('p');
+  body.className = 'coming-soon-card__body';
+  const hasManifest = manifest && Array.isArray(manifest.sections);
+  body.textContent = hasManifest
+    ? `Part ${part}, Section ${section} hasn't been added to the reader yet.`
+    : `Part ${part} hasn't been added to the reader yet.`;
+  card.appendChild(body);
+
+  const back = document.createElement('button');
+  back.type = 'button';
+  back.className = 'coming-soon-card__back';
+  back.textContent = '← Back to home';
+  back.addEventListener('click', goHome);
+  card.appendChild(back);
+
+  content.appendChild(card);
+
+  updateHeader({ title: 'Coming soon', meta: `Part ${part} · Section ${section}` });
+  if (hasManifest) {
     renderParvaNav(part, section, manifest);
   } else {
     clearParvaNav();
   }
   window.scrollTo(0, 0);
+}
+
+function goHome() {
+  renderHome();
+}
+
+function renderHome() {
+  hidePopup();
+  clearParvaNav();
+  state.currentPart = null;
+  state.currentSection = null;
+  highlightActive(null, null);
+  updateHeader(null);
+
+  const content = $('content');
+  content.innerHTML = '';
+
+  const home = document.createElement('div');
+  home.className = 'home';
+
+  const hero = document.createElement('div');
+  hero.className = 'home__hero';
+  const heroTitle = document.createElement('h2');
+  heroTitle.className = 'home__hero-title';
+  heroTitle.textContent = 'Mahabharata';
+  const heroSub = document.createElement('p');
+  heroSub.className = 'home__hero-sub';
+  heroSub.textContent = 'Bibek Debroy — Penguin 10-volume edition';
+  hero.appendChild(heroTitle);
+  hero.appendChild(heroSub);
+  home.appendChild(hero);
+
+  const continueSlot = document.createElement('div');
+  continueSlot.className = 'home__continue-slot';
+  home.appendChild(continueSlot);
+
+  const gridLabel = document.createElement('h3');
+  gridLabel.className = 'home__section-label';
+  gridLabel.textContent = 'Parts';
+  home.appendChild(gridLabel);
+
+  const grid = document.createElement('div');
+  grid.className = 'home__grid';
+  home.appendChild(grid);
+
+  const cards = [];
+  for (let n = 1; n <= CONFIG.partCount; n++) {
+    const card = createHomePartCard(n);
+    grid.appendChild(card);
+    cards.push(card);
+  }
+
+  content.appendChild(home);
+  window.scrollTo(0, 0);
+
+  const last = parseLastParva(localStorage.getItem(STORAGE.lastParva));
+  if (last) hydrateContinueCard(continueSlot, last);
+
+  for (let i = 0; i < cards.length; i++) {
+    hydrateHomePartCard(cards[i], i + 1);
+  }
+}
+
+function createHomePartCard(partNum) {
+  const card = document.createElement('button');
+  card.type = 'button';
+  card.className = 'home__part-card';
+  card.dataset.part = String(partNum);
+  card.disabled = true;
+
+  const num = document.createElement('div');
+  num.className = 'home__part-card-num';
+  num.textContent = `Part ${partNum}`;
+
+  const meta = document.createElement('div');
+  meta.className = 'home__part-card-meta';
+  meta.textContent = '…';
+
+  card.appendChild(num);
+  card.appendChild(meta);
+  return card;
+}
+
+async function hydrateHomePartCard(card, partNum) {
+  const manifest = await getPartManifest(partNum);
+  if (!card.isConnected) return;
+  const meta = card.querySelector('.home__part-card-meta');
+  const sections = manifest && Array.isArray(manifest.sections) ? manifest.sections : [];
+  if (sections.length === 0) {
+    card.classList.add('home__part-card--soon');
+    card.disabled = true;
+    meta.textContent = 'Coming soon';
+    return;
+  }
+  let read = 0;
+  for (const s of sections) {
+    const raw = parseFloat(localStorage.getItem(STORAGE.pos(partNum, s.number)) || '');
+    if (Number.isFinite(raw) && raw >= 0.99) read++;
+  }
+  meta.textContent = read > 0
+    ? `${sections.length} parvas · ${read} read`
+    : `${sections.length} parvas`;
+  card.disabled = false;
+  card.addEventListener('click', () => {
+    expandPart(partNum);
+    loadParva(partNum, sections[0].number);
+  });
+}
+
+async function hydrateContinueCard(slot, last) {
+  const manifest = await getPartManifest(last.part);
+  if (!slot.isConnected) return;
+  if (!manifest || !Array.isArray(manifest.sections)) return;
+  const sec = manifest.sections.find((s) => s.number === last.section);
+  if (!sec) return;
+
+  const card = document.createElement('button');
+  card.type = 'button';
+  card.className = 'home__continue';
+
+  const lbl = document.createElement('div');
+  lbl.className = 'home__continue-label';
+  lbl.textContent = 'Continue reading';
+
+  const name = document.createElement('div');
+  name.className = 'home__continue-name';
+  name.textContent = sec.parva || sec.name || `Section ${last.section}`;
+
+  const meta = document.createElement('div');
+  meta.className = 'home__continue-meta';
+  const idx = manifest.sections.indexOf(sec);
+  const total = manifest.sections.length;
+  const raw = parseFloat(localStorage.getItem(STORAGE.pos(last.part, last.section)) || '');
+  const frac = Number.isFinite(raw) ? Math.max(0, Math.min(1, raw)) : 0;
+  const pct = Math.round(frac * 100);
+  meta.textContent = `Part ${last.part} · ${idx + 1} of ${total}${pct > 0 ? ` · ${pct}%` : ''}`;
+
+  card.appendChild(lbl);
+  card.appendChild(name);
+  card.appendChild(meta);
+  card.addEventListener('click', () => {
+    expandPart(last.part);
+    loadParva(last.part, last.section);
+  });
+
+  slot.appendChild(card);
 }
 
 function updateHeader(opts) {
