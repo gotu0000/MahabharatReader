@@ -65,6 +65,29 @@
     <nav id="parvaNav" class="parva-nav" aria-label="Parva navigation" hidden></nav>
   </main>
 
+  <button id="pageIndicator" class="page-indicator page-indicator--hidden"
+          type="button" hidden aria-label="Jump to page">
+    <span id="pageIndicatorText">1 / 1</span>
+  </button>
+
+  <div id="jumpPopup" class="jump-popup" role="dialog" aria-modal="true"
+       aria-labelledby="jumpPopupTitle" hidden>
+    <div class="jump-popup__backdrop" data-jump-close="1"></div>
+    <div class="jump-popup__card">
+      <div class="jump-popup__title" id="jumpPopupTitle">Go to page</div>
+      <form class="jump-popup__form" id="jumpForm">
+        <input class="jump-popup__input" id="jumpInput" type="number"
+               inputmode="numeric" min="1" step="1" aria-label="Page number">
+        <span class="jump-popup__total" id="jumpTotal">of 1</span>
+        <div class="jump-popup__actions">
+          <button type="button" class="jump-popup__cancel"
+                  data-jump-close="1">Cancel</button>
+          <button type="submit" class="jump-popup__go">Go</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <script src="js/reader.js"></script>
 </body>
 </html>
