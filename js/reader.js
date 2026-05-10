@@ -265,6 +265,7 @@ async function getPartManifest(n) {
 async function loadParva(part, section) {
   const content = $('content');
   hidePopup();
+  clearParvaNav();
   state.currentPart = part;
   state.currentSection = section;
   localStorage.setItem(STORAGE.lastParva, `${pad2(part)}/${pad2(section)}`);
@@ -276,7 +277,7 @@ async function loadParva(part, section) {
     ? manifest.sections.find((s) => s.number === section)
     : null;
   if (!sec || !sec.html) {
-    showNotAvailable(part, section);
+    showNotAvailable(part, section, manifest);
     return;
   }
 
@@ -287,20 +288,151 @@ async function loadParva(part, section) {
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     html = await resp.text();
   } catch {
-    showNotAvailable(part, section);
+    showNotAvailable(part, section, manifest);
     return;
   }
   if (state.currentPart !== part || state.currentSection !== section) return;
 
   content.innerHTML = html;
+  updateHeader({
+    title: sec.parva || sec.name || `Section ${section}`,
+    meta: `Part ${part} · ${manifest.sections.indexOf(sec) + 1} of ${manifest.sections.length}`,
+  });
+  renderParvaNav(part, section, manifest);
   restoreScroll(part, section);
   if (sec.refs) getRefsFor(part, section);
 }
 
-function showNotAvailable(part, section) {
+function showNotAvailable(part, section, manifest) {
   const content = $('content');
   content.innerHTML = `<p class="hint">Part ${part}, Section ${section} not yet available.</p>`;
+  updateHeader({ title: 'Not yet available', meta: `Part ${part} · Section ${section}` });
+  if (manifest && Array.isArray(manifest.sections)) {
+    renderParvaNav(part, section, manifest);
+  } else {
+    clearParvaNav();
+  }
   window.scrollTo(0, 0);
+}
+
+function updateHeader(opts) {
+  const titleEl = $('title');
+  const metaEl = $('titleMeta');
+  if (!opts) {
+    titleEl.textContent = 'Mahabharata';
+    metaEl.textContent = '';
+    metaEl.hidden = true;
+    document.title = 'Mahabharata';
+    return;
+  }
+  titleEl.textContent = opts.title;
+  if (opts.meta) {
+    metaEl.textContent = opts.meta;
+    metaEl.hidden = false;
+  } else {
+    metaEl.textContent = '';
+    metaEl.hidden = true;
+  }
+  document.title = `${opts.title} — Mahabharata`;
+}
+
+function clearParvaNav() {
+  const nav = $('parvaNav');
+  nav.innerHTML = '';
+  nav.hidden = true;
+}
+
+function renderParvaNav(part, section, manifest) {
+  const sections = manifest && Array.isArray(manifest.sections) ? manifest.sections : [];
+  const idx = sections.findIndex((s) => s.number === section);
+  if (idx === -1) {
+    clearParvaNav();
+    return;
+  }
+
+  const toTarget = (s, p) => ({
+    part: p,
+    section: s.number,
+    label: s.parva || s.name || `Section ${s.number}`,
+    crossPart: p !== part,
+  });
+
+  let prev = idx > 0 ? toTarget(sections[idx - 1], part) : null;
+  let next = idx < sections.length - 1 ? toTarget(sections[idx + 1], part) : null;
+  drawParvaNav(prev, next);
+
+  if (!prev && part > 1) {
+    getPartManifest(part - 1).then((m) => {
+      if (state.currentPart !== part || state.currentSection !== section) return;
+      if (!m || !Array.isArray(m.sections) || m.sections.length === 0) return;
+      prev = toTarget(m.sections[m.sections.length - 1], part - 1);
+      drawParvaNav(prev, next);
+    });
+  }
+  if (!next && part < CONFIG.partCount) {
+    getPartManifest(part + 1).then((m) => {
+      if (state.currentPart !== part || state.currentSection !== section) return;
+      if (!m || !Array.isArray(m.sections) || m.sections.length === 0) return;
+      next = toTarget(m.sections[0], part + 1);
+      drawParvaNav(prev, next);
+    });
+  }
+}
+
+function drawParvaNav(prev, next) {
+  const nav = $('parvaNav');
+  nav.innerHTML = '';
+  if (!prev && !next) {
+    nav.hidden = true;
+    return;
+  }
+  appendNavBtn(nav, prev, 'prev');
+  appendNavBtn(nav, next, 'next');
+  nav.hidden = false;
+}
+
+function appendNavBtn(nav, target, dir) {
+  if (!target) {
+    const spacer = document.createElement('span');
+    spacer.className = 'parva-nav__spacer';
+    nav.appendChild(spacer);
+    return;
+  }
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = `parva-nav__btn parva-nav__${dir}`;
+
+  const arrow = document.createElement('span');
+  arrow.className = 'parva-nav__arrow';
+  arrow.setAttribute('aria-hidden', 'true');
+  arrow.textContent = dir === 'prev' ? '←' : '→';
+
+  const meta = document.createElement('span');
+  meta.className = 'parva-nav__meta';
+
+  const dirLbl = document.createElement('span');
+  dirLbl.className = 'parva-nav__dir';
+  dirLbl.textContent = target.crossPart
+    ? `Part ${target.part}`
+    : (dir === 'prev' ? 'Previous' : 'Next');
+
+  const name = document.createElement('span');
+  name.className = 'parva-nav__name';
+  name.textContent = target.label;
+
+  meta.appendChild(dirLbl);
+  meta.appendChild(name);
+  btn.appendChild(arrow);
+  btn.appendChild(meta);
+  btn.setAttribute('aria-label',
+    `${dir === 'prev' ? 'Previous' : 'Next'}: Part ${target.part}, ${target.label}`);
+
+  btn.addEventListener('click', () => {
+    loadParva(target.part, target.section);
+    expandPart(target.part);
+  });
+
+  nav.appendChild(btn);
 }
 
 function restoreScroll(part, section) {

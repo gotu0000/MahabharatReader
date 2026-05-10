@@ -54,17 +54,34 @@ body {
   padding-top: max(0.5rem, env(safe-area-inset-top));
 }
 
-.title {
+.title-block {
   flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  line-height: 1.15;
+}
+
+.title {
   margin: 0;
   font-family: var(--font-ui);
-  font-size: 1rem;
+  font-size: 0.95rem;
   font-weight: 600;
   letter-spacing: 0.01em;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  min-width: 0;
+}
+
+.title-meta {
+  margin-top: 1px;
+  font-size: 0.7rem;
+  opacity: 0.6;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: 0.02em;
 }
 
 .controls {
@@ -270,6 +287,82 @@ body {
 .content h1, .content h2, .content h3 { line-height: 1.3; }
 .content img { max-width: 100%; height: auto; }
 .content a { color: var(--accent); }
+
+.parva-nav {
+  display: flex;
+  gap: 0.6rem;
+  max-width: var(--reading-max);
+  margin: 1.5rem auto 3rem;
+  padding: 0 1.1rem;
+  font-family: var(--font-ui);
+}
+
+.parva-nav__btn {
+  flex: 1 1 50%;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.7rem 0.85rem;
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.parva-nav__btn:hover { border-color: var(--accent); }
+
+.parva-nav__btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.parva-nav__next {
+  text-align: right;
+  flex-direction: row-reverse;
+  margin-left: auto;
+}
+
+.parva-nav__spacer { flex: 1 1 50%; }
+
+.parva-nav__arrow {
+  flex: 0 0 auto;
+  font-size: 1.1rem;
+  color: var(--accent);
+  line-height: 1;
+}
+
+.parva-nav__meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.parva-nav__next .parva-nav__meta { align-items: flex-end; }
+
+.parva-nav__dir {
+  font-size: 0.68rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  opacity: 0.6;
+}
+
+.parva-nav__name {
+  font-size: 0.92rem;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+@media (min-width: 720px) {
+  .parva-nav { padding: 0 1.5rem; }
+}
 
 .content .chapter {
   content-visibility: auto;
