@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#1a1a1a">
-  <title>Book Reader</title>
+  <title>Mahabharata</title>
   <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
@@ -19,7 +19,10 @@
       </svg>
     </button>
 
-    <h1 class="title">Book Reader</h1>
+    <div class="title-block">
+      <h1 id="title" class="title">Mahabharata</h1>
+      <div id="titleMeta" class="title-meta" hidden></div>
+    </div>
 
     <div class="controls">
       <label class="font-size">
@@ -61,6 +64,7 @@
     <article id="content" class="content">
       <p class="hint">Open the menu to choose a part.</p>
     </article>
+    <nav id="parvaNav" class="parva-nav" aria-label="Parva navigation" hidden></nav>
   </main>
 
   <script src="js/reader.js"></script>
