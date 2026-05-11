@@ -1,64 +1,8 @@
-// Encryption tool for Mahabharata Reader content.
-// Constants here MUST match the reader's decrypt code (planned for step 2).
+// Encryption tool UI glue. Crypto logic lives in /js/crypto.js.
 
-const KDF = 'PBKDF2';
-const HASH = 'SHA-256';
-const ITERATIONS = 600000;
-const SALT_BYTES = 32;
-const IV_BYTES = 12;
-const KEY_BITS = 256;
-const VERIFY_TOKEN = 'mb-ok';
-const ENVELOPE_VERSION = 1;
-
-function bytesToB64(bytes) {
-  let bin = '';
-  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
-  return btoa(bin);
-}
-
-function b64ToBytes(b64) {
-  const bin = atob(b64);
-  const out = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-  return out;
-}
-
-async function deriveKey(passphrase, salt) {
-  const baseKey = await crypto.subtle.importKey(
-    'raw',
-    new TextEncoder().encode(passphrase),
-    { name: KDF },
-    false,
-    ['deriveKey']
-  );
-  return crypto.subtle.deriveKey(
-    { name: KDF, salt, iterations: ITERATIONS, hash: HASH },
-    baseKey,
-    { name: 'AES-GCM', length: KEY_BITS },
-    false,
-    ['encrypt', 'decrypt']
-  );
-}
-
-async function encryptText(key, text) {
-  const iv = crypto.getRandomValues(new Uint8Array(IV_BYTES));
-  const ct = await crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv },
-    key,
-    new TextEncoder().encode(text)
-  );
-  return {
-    v: ENVELOPE_VERSION,
-    iv: bytesToB64(iv),
-    ct: bytesToB64(new Uint8Array(ct))
-  };
-}
-
-async function decryptEnvelope(key, envelope) {
-  const iv = b64ToBytes(envelope.iv);
-  const ct = b64ToBytes(envelope.ct);
-  const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ct);
-  return new TextDecoder().decode(pt);
+function setStatus(el, text, isError) {
+  el.textContent = text;
+  el.classList.toggle('error', !!isError);
 }
 
 function downloadBlob(filename, content, mime) {
@@ -71,11 +15,6 @@ function downloadBlob(filename, content, mime) {
   a.click();
   document.body.removeChild(a);
   setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-
-function setStatus(el, text, isError) {
-  el.textContent = text;
-  el.classList.toggle('error', !!isError);
 }
 
 // Mode A: setup
@@ -94,15 +33,15 @@ setupBtn.addEventListener('click', async () => {
   setupBtn.disabled = true;
   setStatus(setupStatus, 'Deriving key…');
   try {
-    const salt = crypto.getRandomValues(new Uint8Array(SALT_BYTES));
+    const salt = crypto.getRandomValues(new Uint8Array(CRYPTO.saltBytes));
     const key = await deriveKey(p1, salt);
-    const verify = await encryptText(key, VERIFY_TOKEN);
+    const verify = await encryptText(key, CRYPTO.verifyToken);
     const config = {
-      v: ENVELOPE_VERSION,
+      v: CRYPTO.envelopeVersion,
       kdf: 'PBKDF2-SHA256',
-      iterations: ITERATIONS,
+      iterations: CRYPTO.iterations,
       salt: bytesToB64(salt),
-      verify: { iv: verify.iv, ct: verify.ct }
+      verify: { iv: verify.iv, ct: verify.ct },
     };
     downloadBlob('encryption.json', JSON.stringify(config, null, 2), 'application/json');
     setStatus(setupStatus, 'Saved encryption.json. Place it at parts/encryption.json in the repo.');
@@ -147,20 +86,14 @@ verifyBtn.addEventListener('click', async () => {
   try {
     const text = await file.text();
     const config = JSON.parse(text);
-    if (config.kdf !== 'PBKDF2-SHA256' || config.iterations !== ITERATIONS) {
+    if (config.kdf !== 'PBKDF2-SHA256' || config.iterations !== CRYPTO.iterations) {
       return setStatus(verifyStatus, 'Unsupported encryption.json (KDF or iteration mismatch).', true);
     }
     const salt = b64ToBytes(config.salt);
     const key = await deriveKey(pass, salt);
-    let token;
-    try {
-      token = await decryptEnvelope(key, config.verify);
-    } catch {
-      return setStatus(verifyStatus, 'Incorrect passphrase.', true);
-    }
-    if (token !== VERIFY_TOKEN) {
-      return setStatus(verifyStatus, 'Incorrect passphrase.', true);
-    }
+    const ok = await verifyKeyAgainstConfig(key, config);
+    if (!ok) return setStatus(verifyStatus, 'Incorrect passphrase.', true);
+
     activeKey = key;
     setStatus(verifyStatus, 'Key verified. Select files below.');
     filesSection.hidden = false;
