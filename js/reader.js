@@ -392,6 +392,8 @@ async function loadParva(part, section) {
   renderParvaNav(part, section, manifest);
   restoreScroll(part, section);
   enablePageIndicator();
+  updatePageIndicator();
+  showPageIndicator();
   requestAnimationFrame(() => {
     updatePageIndicator();
     showPageIndicator();
@@ -606,6 +608,7 @@ function enablePageIndicator() {
   if (!pill) return;
   pill.dataset.disabled = '';
   pill.hidden = false;
+  pill.classList.remove('page-indicator--hidden');
 }
 
 function disablePageIndicator() {
