@@ -28,6 +28,8 @@ const state = {
   pageIndicatorHideTimer: 0,
 };
 
+const secure = { config: null, key: null };
+
 const partManifests = new Map();
 const refsCache = new Map();
 const popup = {
@@ -44,7 +46,21 @@ function $(id) {
   return document.getElementById(id);
 }
 
-document.addEventListener('DOMContentLoaded', init);
+document.addEventListener('DOMContentLoaded', bootstrap);
+
+async function bootstrap() {
+  const config = await loadEncryptionConfig();
+  if (config) {
+    const key = await loadCachedKey();
+    if (!key || !(await verifyKeyAgainstConfig(key, config))) {
+      window.location.replace('index.html');
+      return;
+    }
+    secure.config = config;
+    secure.key = key;
+  }
+  init();
+}
 
 function init() {
   applyTheme(localStorage.getItem(STORAGE.theme) || CONFIG.defaultTheme);
@@ -375,9 +391,15 @@ async function loadParva(part, section) {
   content.innerHTML = '<p class="hint">Loading…</p>';
   let html;
   try {
-    const resp = await fetch(CONFIG.resolveUnderParts(sec.html), { cache: 'no-cache' });
+    const url = CONFIG.resolveUnderParts(sec.html) + (secure.key ? '.enc' : '');
+    const resp = await fetch(url, { cache: 'no-cache' });
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    html = await resp.text();
+    if (secure.key) {
+      const envelope = await resp.json();
+      html = await decryptEnvelope(secure.key, envelope);
+    } else {
+      html = await resp.text();
+    }
   } catch {
     showNotAvailable(part, section, manifest);
     return;
@@ -879,8 +901,17 @@ async function getRefsFor(part, section) {
   }
   let data = null;
   try {
-    const resp = await fetch(CONFIG.resolveUnderParts(sec.refs), { cache: 'no-cache' });
-    if (resp.ok) data = await resp.json();
+    const url = CONFIG.resolveUnderParts(sec.refs) + (secure.key ? '.enc' : '');
+    const resp = await fetch(url, { cache: 'no-cache' });
+    if (resp.ok) {
+      if (secure.key) {
+        const envelope = await resp.json();
+        const text = await decryptEnvelope(secure.key, envelope);
+        data = JSON.parse(text);
+      } else {
+        data = await resp.json();
+      }
+    }
   } catch {}
   refsCache.set(key, data);
   return data;
