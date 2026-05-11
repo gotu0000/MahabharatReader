@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Encryption Tool — Mahabharata Reader</title>
+<style>
+  body {
+    padding: 2em 1em;
+    background: #1a1a1a;
+    color: #d4d4d4;
+    font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    max-width: 640px;
+    margin: 0 auto;
+  }
+  h1 { font-size: 1.4em; margin: 0 0 0.2em; }
+  h2 { font-size: 1.1em; margin: 0 0 0.6em; border-bottom: 1px solid #333; padding-bottom: 0.3em; }
+  .lead { color: #999; margin-top: 0; }
+  section { background: #222; padding: 1em 1.2em; border-radius: 6px; margin-top: 1em; }
+  p { margin: 0 0 0.6em; }
+  label { display: block; margin-top: 0.7em; font-size: 0.9em; color: #bbb; }
+  input[type="password"], input[type="file"] {
+    width: 100%;
+    box-sizing: border-box;
+    margin-top: 0.3em;
+    padding: 0.5em;
+    background: #1a1a1a;
+    color: #d4d4d4;
+    border: 1px solid #444;
+    border-radius: 4px;
+    font: inherit;
+  }
+  input[type="password"]:focus, input[type="file"]:focus, button:focus {
+    outline: 2px solid #7aa2f7;
+    outline-offset: 1px;
+  }
+  button {
+    margin-top: 0.9em;
+    padding: 0.5em 1em;
+    background: #7aa2f7;
+    color: #1a1a1a;
+    border: 0;
+    border-radius: 4px;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button:hover { filter: brightness(1.1); }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .status { margin-top: 0.7em; min-height: 1.2em; font-size: 0.9em; color: #7aa2f7; }
+  .status.error { color: #f7768e; }
+  code { background: #2a2a2a; padding: 0.1em 0.3em; border-radius: 3px; font-size: 0.9em; }
+</style>
+</head>
+<body>
+  <h1>Encryption Tool</h1>
+  <p class="lead">Standalone tool for encrypting parva content. Runs entirely in your browser — nothing is uploaded anywhere.</p>
+
+  <section aria-labelledby="setup-h">
+    <h2 id="setup-h">1. Set up encryption (one-time)</h2>
+    <p>Pick a passphrase. A random salt is generated and a key is derived. Save the resulting <code>encryption.json</code> to <code>parts/encryption.json</code> in the repo.</p>
+    <label>Passphrase
+      <input type="password" id="setup-pass1" autocomplete="new-password">
+    </label>
+    <label>Confirm passphrase
+      <input type="password" id="setup-pass2" autocomplete="new-password">
+    </label>
+    <button id="setup-btn" type="button">Generate encryption.json</button>
+    <div class="status" id="setup-status" role="status" aria-live="polite"></div>
+  </section>
+
+  <section aria-labelledby="encrypt-h">
+    <h2 id="encrypt-h">2. Encrypt files</h2>
+    <p>Load your existing <code>encryption.json</code>, enter the passphrase, then select content files to encrypt. Each file produces a <code>&lt;name&gt;.enc</code> download.</p>
+    <label>encryption.json
+      <input type="file" id="config-input" accept=".json,application/json">
+    </label>
+    <label>Passphrase
+      <input type="password" id="encrypt-pass" autocomplete="current-password">
+    </label>
+    <button id="verify-btn" type="button">Verify passphrase</button>
+    <div class="status" id="verify-status" role="status" aria-live="polite"></div>
+
+    <div id="files-section" hidden>
+      <label>Files to encrypt (HTML or JSON; multiple allowed)
+        <input type="file" id="files-input" multiple accept=".html,.htm,.json,application/json,text/html">
+      </label>
+      <div class="status" id="encrypt-status" role="status" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <script src="encrypt.js"></script>
+</body>
+</html>
